@@ -1,8 +1,16 @@
-import { PDFParse } from 'pdf-parse';
+import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+dotenv.config();
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-const parser = new PDFParse({ url: 'https://bitcoin.org/bitcoin.pdf' });
-const result = await parser.getText();
-// to extract text from page 3 only:
-// const result = await parser.getText({ partial: [3] });
-await parser.destroy();
-console.log(result.text);
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+async function main() {
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: 'Why is the sky blue?',
+    });
+    console.log(response.text);
+}
+
+main();

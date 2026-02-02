@@ -1,10 +1,11 @@
-
+import dotenv from 'dotenv';
+dotenv.config();
 import asyncHandler from 'express-async-handler';
 import { PDFParse } from 'pdf-parse';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 
 // Initialize Gemini
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // @desc    Analyze resume with AI
 // @route   POST /api/resume/analyze
@@ -33,8 +34,6 @@ const analyzeResume = asyncHandler(async (req, res) => {
     }
 
     // 2. Prepare AI Prompt
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
     const prompt = `
     You are an expert AI Resume Analyzer and ATS (Applicant Tracking System) specialist.
     
@@ -42,7 +41,6 @@ const analyzeResume = asyncHandler(async (req, res) => {
     
     Resume Text:
     "${resumeText.substring(0, 10000)}" 
-    ${/* Truncate to avoid token limits if necessary, though 1.5 flash has huge context */ ''}
 
     ${jobDescription ? `Job Description:\n"${jobDescription}"` : ''}
 
@@ -63,11 +61,14 @@ const analyzeResume = asyncHandler(async (req, res) => {
     }
     `;
 
-    // 3. Call AI
+    // 3. Call AI using the same pattern as testpdf.js
     try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let text = response.text();
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+
+        let text = response.text;
 
         // Clean markdown code blocks if AI adds them
         text = text.replace(/```json/g, '').replace(/```/g, '').trim();
