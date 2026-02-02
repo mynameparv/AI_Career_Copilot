@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
-import { login } from '../services/authService';
+import { login, googleLogin } from '../services/authService';
 
 const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIsAuthenticated }) => {
   const navigate = useNavigate();
@@ -27,6 +28,28 @@ const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIs
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    setError('');
+    setLoading(true);
+    try {
+      if (!credentialResponse.credential) {
+        throw new Error('No credential received from Google');
+      }
+      const data = await googleLogin(credentialResponse.credential);
+      localStorage.setItem('userInfo', JSON.stringify(data));
+      setIsAuthenticated(true);
+      navigate('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Google login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setError('Google login failed. Please try again.');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-white p-10 rounded-[40px] shadow-2xl border border-gray-100 space-y-8 animate-in zoom-in-95 duration-500">
@@ -46,6 +69,7 @@ const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIs
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@email.com"
               className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -58,6 +82,7 @@ const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIs
               type="password"
               required
               value={password}
+              placeholder="user123"
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500"
             />
@@ -76,10 +101,18 @@ const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIs
           <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold"><span className="bg-white px-4 text-gray-300">Or continue with</span></div>
         </div>
 
-        <button className="w-full py-3 border-2 border-gray-100 rounded-2xl flex items-center justify-center gap-3 font-bold text-gray-600 hover:bg-gray-50 transition-colors">
-          <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="google" />
-          Google
-        </button>
+        {/* Google Sign-In Button */}
+        <div className="flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            theme="outline"
+            size="large"
+            width="100%"
+            text="continue_with"
+            shape="pill"
+          />
+        </div>
 
         <p className="text-center text-sm font-medium text-gray-500">
           New here? <Link to="/register" className="text-blue-600 font-bold hover:underline">Create an account</Link>

@@ -1,1 +1,18 @@
-[]
+[
+  {
+    "_id": "b22ef5c2-eb66-4224-862a-37f0777aa031",
+    "title": "Resume Content Generator Project Roadmap",
+    "description": "A comprehensive strategic plan to develop an AI-driven platform that automates the creation of professional resume summaries, bullet points, and skills sections based on job descriptions and user history.",
+    "status": "Planned",
+    "createdAt": "2026-02-02T23:47:15.286Z",
+    "updatedAt": "2026-02-02T23:47:15.286Z"
+  },
+  {
+    "_id": "e37c90a2-4663-4aac-aa42-6f9968134988",
+    "title": "E-commerce Website Development Roadmap",
+    "description": "A comprehensive plan for building a scalable and user-friendly online shopping platform from discovery to launch.",
+    "status": "Planned",
+    "createdAt": "2026-02-02T23:48:19.200Z",
+    "updatedAt": "2026-02-02T23:48:19.200Z"
+  }
+]

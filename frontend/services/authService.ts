@@ -35,6 +35,24 @@ export const login = async (userData: any) => {
     return response.json();
 };
 
+export const googleLogin = async (credential: string) => {
+    const response = await fetch(`${API_URL}/google`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential }),
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Google login failed');
+    }
+
+    return response.json();
+};
+
 export const logout = () => {
     localStorage.removeItem('userInfo');
 };
+

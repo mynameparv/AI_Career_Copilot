@@ -1,9 +1,30 @@
-
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { getProjects, Project } from '../services/projectService';
 
 const Dashboard: React.FC = () => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  const userName = userInfo.name || 'User';
+
+  const [projects, setProjects] = React.useState<Project[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const data = await getProjects();
+        setProjects(data);
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProjects();
+  }, []);
+
   const stats = [
-    { label: 'Active Projects', value: '4', trend: '+1 this week', color: 'blue' },
+    { label: 'Active Projects', value: projects.length.toString(), trend: '+1 this week', color: 'blue' },
     { label: 'Applications Sent', value: '12', trend: '3 pending', color: 'green' },
     { label: 'Upcoming Interviews', value: '2', trend: 'Next: Friday', color: 'purple' },
     { label: 'Resume Score', value: '88', trend: 'Top 10%', color: 'orange' },
@@ -12,7 +33,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       <header>
-        <h1 className="text-3xl font-bold text-gray-900">Good morning, John 👋</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Hello, {userName} 👋</h1>
         <p className="text-gray-500 mt-1">Here's what's happening with your career today.</p>
       </header>
 
@@ -33,20 +54,30 @@ const Dashboard: React.FC = () => {
               <span>🏗️</span> Recent Projects
             </h2>
             <div className="space-y-4">
-              {[
-                { name: 'AI Portfolio Builder', status: 'In Progress', progress: 65 },
-                { name: 'Distributed Cache System', status: 'Planning', progress: 10 },
-              ].map((project, i) => (
-                <div key={i} className="group cursor-pointer">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-sm font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">{project.name}</span>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{project.status}</span>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-1.5">
-                    <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${project.progress}%` }}></div>
-                  </div>
-                </div>
-              ))}
+              {loading ? (
+                <p className="text-sm text-gray-400">Loading projects...</p>
+              ) : projects.length > 0 ? (
+                projects.slice(0, 3).map((project, i) => (
+                  <Link key={i} to={`/projects?id=${project._id}`} className="group block">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">
+                        {project.title}
+                      </span>
+                      <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                        {project.status}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-1.5">
+                      <div
+                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${project.progress || 0}%` }}
+                      ></div>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No active projects. Head to "Build Project" to start one!</p>
+              )}
             </div>
           </div>
 
