@@ -1,19 +1,28 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { getGeminiResponse } from '../services/geminiService';
+import { useChatStorage, ChatMessage } from '../hooks/useTemporaryStorage';
 
-interface Message {
-  role: 'user' | 'ai';
-  content: string;
-}
+const INITIAL_MESSAGE: ChatMessage = {
+  id: 'welcome',
+  role: 'assistant',
+  content: "Hi! I'm your AI Career & Project Copilot. How can I help you grow today? Whether it's brainstorming a project idea, reviewing a job description, or prepping for an interview, I'm here.",
+  timestamp: Date.now()
+};
 
 const AICopilot: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', content: "Hi! I'm your AI Career & Project Copilot. How can I help you grow today? Whether it's brainstorming a project idea, reviewing a job description, or prepping for an interview, I'm here." }
-  ]);
+  // Use persistent storage hook instead of useState
+  const { messages, addUserMessage, addAIMessage, clearChat } = useChatStorage();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Add welcome message if chat is empty
+  useEffect(() => {
+    if (messages.length === 0) {
+      addAIMessage(INITIAL_MESSAGE.content);
+    }
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -26,15 +35,15 @@ const AICopilot: React.FC = () => {
 
     const userMsg = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    addUserMessage(userMsg);
     setIsLoading(true);
 
     try {
       const response = await getGeminiResponse(userMsg);
-      setMessages(prev => [...prev, { role: 'ai', content: response || "I'm sorry, I couldn't generate a response." }]);
+      addAIMessage(response || "I'm sorry, I couldn't generate a response.");
     } catch (error) {
       console.error(error);
-      setMessages(prev => [...prev, { role: 'ai', content: "Error communicating with AI. Please check your configuration." }]);
+      addAIMessage("Error communicating with AI. Please check your configuration.");
     } finally {
       setIsLoading(false);
     }
@@ -47,25 +56,24 @@ const AICopilot: React.FC = () => {
           <div className="w-3 h-3 bg-green-500 rounded-full"></div>
           <h2 className="font-bold text-gray-800">AI Copilot</h2>
         </div>
-        <button 
-          onClick={() => setMessages([messages[0]])}
+        <button
+          onClick={() => clearChat()}
           className="text-xs text-gray-400 hover:text-gray-600 font-medium"
         >
           Reset Conversation
         </button>
       </div>
 
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
       >
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${
-              msg.role === 'user' 
-                ? 'bg-blue-600 text-white rounded-tr-none' 
-                : 'bg-gray-100 text-gray-800 rounded-tl-none border border-gray-200 shadow-sm'
-            }`}>
+            <div className={`max-w-[80%] rounded-2xl px-5 py-3 ${msg.role === 'user'
+              ? 'bg-blue-600 text-white rounded-tr-none'
+              : 'bg-gray-100 text-gray-800 rounded-tl-none border border-gray-200 shadow-sm'
+              }`}>
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
             </div>
           </div>
@@ -97,7 +105,7 @@ const AICopilot: React.FC = () => {
             placeholder="Ask me anything about your career..."
             className="flex-1 p-3 text-sm bg-gray-100 border-none rounded-xl focus:ring-2 focus:ring-blue-500 resize-none h-12"
           />
-          <button 
+          <button
             onClick={handleSend}
             disabled={isLoading || !input.trim()}
             className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 disabled:opacity-50 transition-all shadow-md active:scale-95"

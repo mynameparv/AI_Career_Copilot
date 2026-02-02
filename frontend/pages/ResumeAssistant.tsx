@@ -1,13 +1,25 @@
 
 import React, { useState } from 'react';
 import { analyzeResume, AnalysisResult } from '../services/resumeService';
+import { useATSStorage, useLocalStorage } from '../hooks/useTemporaryStorage';
 
 const ResumeAssistant: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
-  const [jobDescription, setJobDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Use persistent storage hooks
+  const { currentFeedback, saveATSFeedback, clearCurrentFeedback } = useATSStorage();
+  const [jobDescription, setJobDescription] = useLocalStorage<string>('copilot_job_description', '');
+
+  // Convert current feedback to AnalysisResult format for display
+  const analysis: AnalysisResult | null = currentFeedback ? {
+    atsScore: currentFeedback.atsScore,
+    strengths: currentFeedback.strengths,
+    weaknesses: currentFeedback.weaknesses,
+    suggestions: currentFeedback.suggestions,
+    summary: currentFeedback.summary,
+  } : null;
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = e.target.files?.[0];
@@ -18,7 +30,8 @@ const ResumeAssistant: React.FC = () => {
 
       try {
         const result = await analyzeResume(uploadedFile, jobDescription);
-        setAnalysis(result);
+        // Save to persistent storage
+        saveATSFeedback(uploadedFile.name, result, jobDescription);
       } catch (err) {
         console.error(err);
         setError('Failed to analyze resume. Please try again.');
@@ -151,7 +164,7 @@ const ResumeAssistant: React.FC = () => {
             </div>
 
             <button
-              onClick={() => { setAnalysis(null); setFile(null); }}
+              onClick={() => { clearCurrentFeedback(); setFile(null); }}
               className="w-full py-3 text-gray-400 font-bold text-sm hover:text-gray-600 transition-colors"
             >
               Upload New Version
