@@ -14,14 +14,15 @@ const getJobs = asyncHandler(async (req, res) => {
 // @route   POST /api/jobs
 // @access  Private
 const createJob = asyncHandler(async (req, res) => {
-    const { company, role, status, notes } = req.body;
+    const { company, role, status, notes, description } = req.body;
 
-    const createdJob = Job.create({
+    const createdJob = await Job.create({
         user: req.user._id,
         company,
         role,
         status,
         notes,
+        description,
     });
 
     res.status(201).json(createdJob);
@@ -31,7 +32,7 @@ const createJob = asyncHandler(async (req, res) => {
 // @route   PUT /api/jobs/:id
 // @access  Private
 const updateJob = asyncHandler(async (req, res) => {
-    const job = Job.findById(req.params.id);
+    const job = await Job.findById(req.params.id);
 
     if (job) {
         if (job.user.toString() !== req.user._id.toString()) {
@@ -39,12 +40,13 @@ const updateJob = asyncHandler(async (req, res) => {
             throw new Error('User not authorized');
         }
 
-        const updatedJob = Job.findByIdAndUpdate(req.params.id, {
+        const updatedJob = await Job.findByIdAndUpdate(req.params.id, {
             company: req.body.company || job.company,
             role: req.body.role || job.role,
             status: req.body.status || job.status,
             notes: req.body.notes !== undefined ? req.body.notes : job.notes,
-        });
+            description: req.body.description !== undefined ? req.body.description : job.description,
+        }, { new: true });
 
         res.json(updatedJob);
     } else {
@@ -57,7 +59,7 @@ const updateJob = asyncHandler(async (req, res) => {
 // @route   DELETE /api/jobs/:id
 // @access  Private
 const deleteJob = asyncHandler(async (req, res) => {
-    const job = Job.findById(req.params.id);
+    const job = await Job.findById(req.params.id);
 
     if (job) {
         if (job.user.toString() !== req.user._id.toString()) {
@@ -65,7 +67,7 @@ const deleteJob = asyncHandler(async (req, res) => {
             throw new Error('User not authorized');
         }
 
-        Job.findByIdAndDelete(req.params.id);
+        await Job.findByIdAndDelete(req.params.id);
         res.json({ message: 'Job removed' });
     } else {
         res.status(404);

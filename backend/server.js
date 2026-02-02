@@ -29,10 +29,13 @@ app.use((req, res, next) => {
 app.use(cors());
 app.use(express.json());
 
+import resumeRoutes from './routes/resumeRoutes.js';
+
 app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/resume', resumeRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

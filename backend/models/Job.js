@@ -1,35 +1,44 @@
 
-import LocalDb from '../utils/localDb.js';
+import mongoose from 'mongoose';
 
-const jobDb = new LocalDb('jobs');
-
-class Job {
-    static create(jobData) {
-        // Ensure default values
-        if (!jobData.status) {
-            jobData.status = 'Applied';
+const jobSchema = mongoose.Schema(
+    {
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true,
+            ref: 'User',
+        },
+        company: {
+            type: String,
+            required: [true, 'Please add a company name'],
+        },
+        role: {
+            type: String,
+            required: [true, 'Please add a role/title'],
+        },
+        status: {
+            type: String,
+            enum: ['Wishlist', 'Applied', 'Interviewing', 'Offer', 'Rejected'],
+            default: 'Applied',
+        },
+        description: {
+            type: String, // Optional job description for AI analysis
+            required: false,
+        },
+        dateApplied: {
+            type: Date,
+            default: Date.now,
+        },
+        notes: {
+            type: String,
+            required: false
         }
-        if (!jobData.dateApplied) {
-            jobData.dateApplied = new Date();
-        }
-        return jobDb.create(jobData);
+    },
+    {
+        timestamps: true,
     }
+);
 
-    static find(query) {
-        return jobDb.find(query);
-    }
-
-    static findById(id) {
-        return jobDb.findById(id);
-    }
-
-    static findByIdAndUpdate(id, update) {
-        return jobDb.findByIdAndUpdate(id, update);
-    }
-
-    static findByIdAndDelete(id) {
-        return jobDb.findByIdAndDelete(id);
-    }
-}
+const Job = mongoose.model('Job', jobSchema);
 
 export default Job;
