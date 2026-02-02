@@ -1,0 +1,9 @@
+
+{
+  "name": "AI Career & Project Copilot",
+  "description": "A Notion-inspired professional assistant for career growth, job tracking, and project roadmapping powered by Gemini AI.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
