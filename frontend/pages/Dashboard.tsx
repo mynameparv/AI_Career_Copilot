@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { getProjects, Project } from '../services/projectService';
 import { useATSStorage } from '../hooks/useTemporaryStorage';
 import { getDashboardSuggestions } from '../services/geminiService';
+import { getApplications, JobApplication } from '../services/jobService';
 
 const Dashboard: React.FC = () => {
   const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
   const userName = userInfo.name || 'User';
 
   const [projects, setProjects] = React.useState<Project[]>([]);
+  const [applications, setApplications] = React.useState<JobApplication[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [suggestions, setSuggestions] = React.useState<any[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = React.useState(true);
@@ -19,8 +21,13 @@ const Dashboard: React.FC = () => {
     const initDashboard = async () => {
       try {
         setLoading(true);
-        const projectData = await getProjects();
+        const [projectData, appData] = await Promise.all([
+          getProjects(),
+          getApplications()
+        ]);
+
         setProjects(projectData);
+        setApplications(appData);
 
         // Fetch AI suggestions based on current state
         setSuggestionsLoading(true);
@@ -39,8 +46,20 @@ const Dashboard: React.FC = () => {
 
   const stats = [
     { label: 'Active Projects', value: projects.length.toString(), trend: '+1 this week', color: 'blue', icon: '🏗️' },
-    { label: 'Applications', value: '12', trend: '3 pending', color: 'green', icon: '📬' },
-    { label: 'Interviews', value: '2', trend: 'Next: Friday', color: 'purple', icon: '🤝' },
+    {
+      label: 'Applications',
+      value: applications.length.toString(),
+      trend: `${applications.filter(a => a.status === 'Applied').length} pending`,
+      color: 'green',
+      icon: '📬'
+    },
+    {
+      label: 'Interviews',
+      value: applications.filter(a => a.status === 'Interviewing').length.toString(),
+      trend: 'Next: Friday',
+      color: 'purple',
+      icon: '🤝'
+    },
     {
       label: 'Resume Score',
       value: currentFeedback ? currentFeedback.atsScore.toString() : '—',
