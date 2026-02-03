@@ -152,30 +152,30 @@ const Dashboard: React.FC = () => {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-xl notion-shadow">
-            <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
-            <div className="space-y-2">
-              <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors flex items-center gap-3">
-                <span className="bg-blue-100 p-2 rounded text-blue-600">✨</span>
+          <div className="bg-white p-8 rounded-[2rem] notion-shadow border border-gray-100">
+            <h2 className="text-xl font-black mb-6">Quick Actions</h2>
+            <div className="space-y-3">
+              <Link to="/projects" className="w-full text-left px-5 py-4 rounded-2xl border border-gray-50 hover:bg-blue-50 transition-all flex items-center gap-4 group">
+                <span className="bg-blue-100 w-10 h-10 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">✨</span>
                 <div className="text-sm">
-                  <p className="font-semibold text-gray-800">Generate Idea</p>
-                  <p className="text-xs text-gray-500">Get AI project inspiration</p>
+                  <p className="font-black text-gray-800">Generate Idea</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Build new roadmap</p>
                 </div>
-              </button>
-              <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors flex items-center gap-3">
-                <span className="bg-green-100 p-2 rounded text-green-600">📊</span>
+              </Link>
+              <Link to="/tracker" className="w-full text-left px-5 py-4 rounded-2xl border border-gray-50 hover:bg-green-50 transition-all flex items-center gap-4 group">
+                <span className="bg-green-100 w-10 h-10 rounded-xl flex items-center justify-center text-green-600 group-hover:scale-110 transition-transform">📊</span>
                 <div className="text-sm">
-                  <p className="font-semibold text-gray-800">Job Tracker</p>
-                  <p className="text-xs text-gray-500">Update application status</p>
+                  <p className="font-black text-gray-800">Job Tracker</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Update applications</p>
                 </div>
-              </button>
-              <button className="w-full text-left px-4 py-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors flex items-center gap-3">
-                <span className="bg-purple-100 p-2 rounded text-purple-600">📑</span>
+              </Link>
+              <Link to="/resume" className="w-full text-left px-5 py-4 rounded-2xl border border-gray-50 hover:bg-purple-50 transition-all flex items-center gap-4 group">
+                <span className="bg-purple-100 w-10 h-10 rounded-xl flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform">📑</span>
                 <div className="text-sm">
-                  <p className="font-semibold text-gray-800">Fix Resume</p>
-                  <p className="text-xs text-gray-500">AI-powered scan & fix</p>
+                  <p className="font-black text-gray-800">Fix Resume</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">AI Scan & Improve</p>
                 </div>
-              </button>
+              </Link>
             </div>
           </div>
         </div>
