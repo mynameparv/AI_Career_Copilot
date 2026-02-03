@@ -1,113 +1,77 @@
-
 import asyncHandler from 'express-async-handler';
 import Project from '../models/Project.js';
-import { GoogleGenAI } from '@google/genai';
+import User from '../models/User.js';
 
-// Initialize Gemini
-// Note: In production, ensure process.env.GEMINI_API_KEY is set
-const genAI = process.env.GEMINI_API_KEY
-    ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-    : null;
-
-// @desc    Get all projects
+// @desc    Get all projects for the logged-in user
 // @route   GET /api/projects
 // @access  Private
 const getProjects = asyncHandler(async (req, res) => {
-    const projects = await Project.find({ user: req.user._id });
+    const projects = await Project.find({ user: req.user._id }).sort({ updatedAt: -1 });
     res.json(projects);
 });
 
-// @desc    Create a project (Manual)
+// @desc    Create a new project
 // @route   POST /api/projects
 // @access  Private
 const createProject = asyncHandler(async (req, res) => {
-    const { title, description, status } = req.body;
+    // Frontend sends 'title' and 'progress', so we extract those
+    const { title, projectType, description, status, roadmap, progress } = req.body;
 
-    const createdProject = Project.create({
+    if (!title) {
+        res.status(400);
+        throw new Error('Project title is required');
+    }
+
+    const project = await Project.create({
         user: req.user._id,
         title,
+        projectType: projectType || 'other',
         description,
-        status,
+        status: status || 'Planned',
+        roadmap,
+        progress: progress || 0,
+        workflowState: {
+            chatHistory: [],
+            aiSteps: []
+        }
     });
 
-    res.status(201).json(createdProject);
-});
-
-// @desc    Generate AI Roadmap and create Project
-// @route   POST /api/projects/generate
-// @access  Private
-const generateProjectRoadmap = asyncHandler(async (req, res) => {
-    const { topic } = req.body;
-
-    if (!genAI) {
-        res.status(500);
-        throw new Error('Gemini API Key not configured');
-    }
-
-    // Use the gemini-1.5-flash model as it is a common stable model, or check valid ones
-    // We'll use a model name that is generally available or user specified
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `Create a detailed project roadmap for: ${topic}. 
-  Return ONLY valid JSON with the following structure:
-  {
-    "title": "Project Title",
-    "description": "Short description",
-    "phases": [
-      {
-        "name": "Phase Name",
-        "tasks": ["Task 1", "Task 2"],
-        "duration": "Estimated Duration"
-      }
-    ]
-  }`;
-
-    try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        let text = response.text();
-
-        // Clean up markdown code blocks if present to parse JSON
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const roadmapData = JSON.parse(text);
-
-        const createdProject = Project.create({
-            user: req.user._id,
-            title: roadmapData.title || topic,
-            description: roadmapData.description,
-            roadmap: roadmapData,
-            status: 'Planned'
+    if (project) {
+        await User.findByIdAndUpdate(req.user._id, {
+            $push: { projects: project._id }
         });
-
-        res.status(201).json(createdProject);
-
-    } catch (error) {
-        console.error('AI Generation Error:', error);
-        res.status(500);
-        throw new Error('Failed to generate roadmap');
+        res.status(201).json(project);
+    } else {
+        res.status(400);
+        throw new Error('Invalid project data');
     }
 });
 
-// @desc    Update a project
+// @desc    Update project progress and state
 // @route   PUT /api/projects/:id
 // @access  Private
 const updateProject = asyncHandler(async (req, res) => {
-    const project = Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id);
 
     if (project) {
         if (project.user.toString() !== req.user._id.toString()) {
             res.status(401);
-            throw new Error('User not authorized');
+            throw new Error('User not authorized to update this project');
         }
 
-        const updatedProject = Project.findByIdAndUpdate(req.params.id, {
-            title: req.body.title || project.title,
-            description: req.body.description || project.description,
-            status: req.body.status || project.status,
-            roadmap: req.body.roadmap || project.roadmap,
-        });
+        project.title = req.body.title || project.title;
+        project.status = req.body.status || project.status;
+        project.progress = req.body.progress !== undefined ? req.body.progress : project.progress;
+        project.roadmap = req.body.roadmap || project.roadmap;
 
+        if (req.body.workflowState) {
+            project.workflowState = {
+                ...project.workflowState,
+                ...req.body.workflowState
+            };
+        }
+
+        const updatedProject = await project.save();
         res.json(updatedProject);
     } else {
         res.status(404);
@@ -119,7 +83,7 @@ const updateProject = asyncHandler(async (req, res) => {
 // @route   DELETE /api/projects/:id
 // @access  Private
 const deleteProject = asyncHandler(async (req, res) => {
-    const project = Project.findById(req.params.id);
+    const project = await Project.findById(req.params.id);
 
     if (project) {
         if (project.user.toString() !== req.user._id.toString()) {
@@ -127,12 +91,59 @@ const deleteProject = asyncHandler(async (req, res) => {
             throw new Error('User not authorized');
         }
 
-        Project.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Project removed' });
+        await project.deleteOne();
+        await User.findByIdAndUpdate(req.user._id, {
+            $pull: { projects: req.params.id }
+        });
+
+        res.json({ message: 'Project removed successfully' });
     } else {
         res.status(404);
         throw new Error('Project not found');
     }
 });
 
-export { getProjects, createProject, generateProjectRoadmap, updateProject, deleteProject };
+// @desc    Generate AI Roadmap and create Project
+// @route   POST /api/projects/generate
+// @access  Private
+const generateProjectRoadmap = asyncHandler(async (req, res) => {
+    const { topic } = req.body;
+
+    if (!topic) {
+        res.status(400);
+        throw new Error('Topic is required for roadmap generation');
+    }
+
+    const roadmapData = {
+        title: `AI Roadmap: ${topic}`,
+        description: `Step-by-step guide for ${topic}`,
+        phases: [
+            { name: 'Research', tasks: [{ text: 'Market study', completed: false }], duration: '1 week' },
+            { name: 'Implementation', tasks: [{ text: 'Coding', completed: false }], duration: '2 weeks' }
+        ]
+    };
+
+    const project = await Project.create({
+        user: req.user._id,
+        title: roadmapData.title,
+        projectType: 'roadmap',
+        description: roadmapData.description,
+        roadmap: roadmapData,
+        status: 'Planned',
+        progress: 0
+    });
+
+    await User.findByIdAndUpdate(req.user._id, {
+        $push: { projects: project._id }
+    });
+
+    res.status(201).json(project);
+});
+
+export {
+    getProjects,
+    createProject,
+    updateProject,
+    deleteProject,
+    generateProjectRoadmap
+};

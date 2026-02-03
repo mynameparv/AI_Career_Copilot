@@ -15,13 +15,10 @@ const protect = async (req, res, next) => {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             console.log('[AUTH] Token decoded, user ID:', decoded.id);
 
-            const user = User.findById(decoded.id);
-            console.log('[AUTH] User lookup result:', user ? 'Found' : 'Not found');
+            const user = await User.findById(decoded.id).select('-password');
 
             if (user) {
-                // Exclude password from req.user
-                const { password, ...userWithoutPassword } = user;
-                req.user = userWithoutPassword;
+                req.user = user;
                 console.log('[AUTH] User authenticated:', user._id);
                 next();
             } else {

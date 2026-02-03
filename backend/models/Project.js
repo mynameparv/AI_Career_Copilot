@@ -1,32 +1,65 @@
+import mongoose from 'mongoose';
 
-import LocalDb from '../utils/localDb.js';
-
-const projectDb = new LocalDb('projects');
-
-class Project {
-    static create(projectData) {
-        // Ensure default values
-        if (!projectData.status) {
-            projectData.status = 'Planned';
+const projectSchema = mongoose.Schema(
+    {
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: true,
+            ref: 'User',
+        },
+        title: {
+            type: String,
+            required: true,
+        },
+        projectType: {
+            type: String,
+            required: true,
+            enum: ['chatbot', 'ATS resume checker', 'roadmap', 'other'],
+            default: 'other',
+        },
+        status: {
+            type: String,
+            required: true,
+            enum: ['Planned', 'In Progress', 'Completed', 'On Hold'],
+            default: 'Planned',
+        },
+        progress: {
+            type: Number,
+            required: true,
+            default: 0,
+            min: 0,
+            max: 100,
+        },
+        workflowState: {
+            chatHistory: [
+                {
+                    role: { type: String, enum: ['user', 'assistant'] },
+                    content: String,
+                    timestamp: { type: Date, default: Date.now }
+                }
+            ],
+            atsFeedback: {
+                score: Number,
+                suggestions: [String],
+                lastAnalyzed: Date
+            },
+            aiSteps: [
+                {
+                    title: String,
+                    description: String,
+                    isCompleted: { type: Boolean, default: false }
+                }
+            ]
+        },
+        roadmap: {
+            type: Object, // Stores the detailed AI roadmap JSON
         }
-        return projectDb.create(projectData);
+    },
+    {
+        timestamps: true,
     }
+);
 
-    static find(query) {
-        return projectDb.find(query);
-    }
-
-    static findById(id) {
-        return projectDb.findById(id);
-    }
-
-    static findByIdAndUpdate(id, update) {
-        return projectDb.findByIdAndUpdate(id, update);
-    }
-
-    static findByIdAndDelete(id) {
-        return projectDb.findByIdAndDelete(id);
-    }
-}
+const Project = mongoose.model('Project', projectSchema);
 
 export default Project;

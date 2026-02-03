@@ -59,7 +59,17 @@ const Projects: React.FC = () => {
     setAiFeedback('');
     try {
       const result = await generateProjectRoadmap(topic);
-      setRoadmap(result);
+      // Ensure tasks are objects with completion status
+      const formatted = {
+        ...result,
+        phases: result.phases.map((p: any) => ({
+          ...p,
+          tasks: p.tasks.map((t: any) =>
+            typeof t === 'string' ? { text: t, completed: false } : t
+          )
+        }))
+      };
+      setRoadmap(formatted);
     } catch (error) {
       console.error(error);
     } finally {
@@ -71,25 +81,26 @@ const Projects: React.FC = () => {
     if (!roadmap) return;
     setSaving(true);
     try {
-      // Format tasks to include completion status if they are just strings
-      const formattedPhases = roadmap.phases.map(phase => ({
-        ...phase,
-        tasks: phase.tasks.map(task =>
-          typeof task === 'string' ? { text: task, completed: false } : task
-        )
+      // Calculate initial progress based on current checkmarks
+      let total = 0;
+      let done = 0;
+      roadmap.phases.forEach(p => p.tasks.forEach(t => {
+        total++; if (t.completed) done++;
       }));
+      const progress = total > 0 ? Math.round((done / total) * 100) : 0;
 
       const newProject = await createProject({
         title: roadmap.title,
         description: roadmap.description,
-        status: 'In Progress',
-        roadmap: { ...roadmap, phases: formattedPhases },
-        progress: 0
+        status: progress === 100 ? 'Completed' : 'In Progress',
+        roadmap: roadmap,
+        progress: progress
       });
 
       setCurrentProject(newProject);
       setSaved(true);
-      alert('Project saved successfully!');
+      // Update local list
+      setMyProjects([newProject, ...myProjects]);
     } catch (error) {
       console.error(error);
       alert('Failed to save project');
@@ -99,50 +110,55 @@ const Projects: React.FC = () => {
   };
 
   const toggleTask = async (phaseIdx: number, taskIdx: number) => {
-    if (!currentProject || !roadmap) return;
+    if (!roadmap) return;
 
-    const updatedPhases = JSON.parse(JSON.stringify(roadmap.phases)); // deep copy
+    const updatedPhases = JSON.parse(JSON.stringify(roadmap.phases));
     const task = updatedPhases[phaseIdx].tasks[taskIdx];
     task.completed = !task.completed;
 
-    // Calculate overall progress
-    let totalTasks = 0;
-    let completedTasks = 0;
-    updatedPhases.forEach((p: any) => {
-      p.tasks.forEach((t: any) => {
-        totalTasks++;
-        if (t.completed) completedTasks++;
-      });
-    });
+    const newRoadmap = { ...roadmap, phases: updatedPhases };
+    setRoadmap(newRoadmap);
 
-    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-    try {
-      const updated = await updateProject(currentProject._id!, {
-        roadmap: { ...roadmap, phases: updatedPhases },
-        progress,
-        status: progress === 100 ? 'Completed' : 'In Progress'
+    if (currentProject) {
+      // Calculate overall progress
+      let totalTasks = 0;
+      let completedTasks = 0;
+      updatedPhases.forEach((p: any) => {
+        p.tasks.forEach((t: any) => {
+          totalTasks++;
+          if (t.completed) completedTasks++;
+        });
       });
-      setCurrentProject(updated);
-      setRoadmap(updated.roadmap);
-    } catch (err) {
-      console.error("failed to update task", err);
+
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      try {
+        const updated = await updateProject(currentProject._id!, {
+          roadmap: newRoadmap,
+          progress,
+          status: progress === 100 ? 'Completed' : 'In Progress'
+        });
+        setCurrentProject(updated);
+      } catch (err) {
+        console.error("failed to update task", err);
+      }
     }
   };
 
   const handleAnalyze = async () => {
-    if (!currentProject || !roadmap) return;
+    if (!roadmap) return;
     setAnalyzing(true);
     try {
-      const prompt = `I am working on the project "${currentProject.title}". 
-      Description: ${currentProject.description}.
-      My current progress is ${currentProject.progress}%.
-      Here is my roadmap: ${JSON.stringify(roadmap)}.
+      // Use current roadmap state for analysis even if not saved yet
+      const prompt = `I am working on a project titled "${roadmap.title}". 
+      Description: ${roadmap.description}.
       
-      Can you analyze my current status and give me:
-      1. One small next step I should take right now.
-      2. A tip to make this project stand out in a resume.
-      3. A potential technical challenge I might face next.`;
+      Here is my current roadmap progress: ${JSON.stringify(roadmap.phases)}.
+      
+      Please analyze my status and provide:
+      1. One immediate "quick win" task.
+      2. A resume-boosting tip for this specific stack.
+      3. A potential bug or challenge to watch out for.`;
 
       const feedback = await getGeminiResponse(prompt);
       setAiFeedback(feedback || 'Analysis complete.');
@@ -155,135 +171,155 @@ const Projects: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-12">
+    <div className="max-w-6xl mx-auto space-y-6 pb-24">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">
             {currentProject ? currentProject.title : 'AI Project Builder'}
           </h1>
-          <p className="text-gray-500 mt-1">
-            {currentProject ? 'Track your progress and get AI advice' : 'Convert your ideas into actionable step-by-step roadmaps.'}
+          <p className="text-gray-500 font-medium mt-1">
+            {currentProject ? 'Your interactive personal roadmap' : 'Turn any idea into a professional technical plan.'}
           </p>
         </div>
-        {currentProject && (
-          <div className="flex items-center gap-3">
+        {(currentProject || roadmap) && (
+          <div className="flex items-center gap-4 bg-white p-3 rounded-2xl notion-shadow border border-gray-100">
             <div className="text-right">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Global Progress</p>
-              <p className="text-lg font-black text-blue-600">{currentProject.progress}%</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Progress</p>
+              <p className="text-xl font-black text-blue-600">
+                {(() => {
+                  let total = 0, done = 0;
+                  roadmap?.phases.forEach(p => p.tasks.forEach(t => { total++; if (t.completed) done++; }));
+                  return total > 0 ? Math.round((done / total) * 100) : 0;
+                })()}%
+              </p>
             </div>
-            <div className="w-32 bg-gray-200 rounded-full h-2">
-              <div className="bg-blue-600 h-2 rounded-full transition-all duration-700" style={{ width: `${currentProject.progress}%` }}></div>
+            <div className="w-24 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="bg-blue-600 h-full transition-all duration-1000"
+                style={{
+                  width: `${(() => {
+                    let total = 0, done = 0;
+                    roadmap?.phases.forEach(p => p.tasks.forEach(t => { total++; if (t.completed) done++; }));
+                    return total > 0 ? Math.round((done / total) * 100) : 0;
+                  })()}%`
+                }}
+              ></div>
             </div>
           </div>
         )}
       </header>
 
       {!currentProject && (
-        <div className="bg-white p-6 rounded-2xl notion-shadow">
+        <div className="bg-white p-6 rounded-3xl notion-shadow border border-gray-100 transition-all focus-within:ring-2 focus-within:ring-blue-500/20">
           <div className="flex flex-col md:flex-row gap-3">
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="E.g., Full-stack E-commerce site with Next.js or a Python Data Scraper"
-              className="flex-1 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm"
+              placeholder="What project are you dreaming of building?"
+              className="flex-1 p-4 bg-gray-50 border-none rounded-2xl text-sm font-medium focus:ring-0"
             />
             <button
               onClick={handleGenerate}
               disabled={loading}
-              className="px-8 py-3 bg-gray-900 text-white rounded-xl text-sm font-bold hover:bg-gray-800 disabled:opacity-50 transition-all shadow-md active:scale-95"
+              className="px-8 py-4 bg-gray-900 text-white rounded-2xl text-sm font-bold hover:bg-gray-800 disabled:opacity-50 transition-all shadow-xl active:scale-95 flex items-center justify-center gap-2"
             >
-              {loading ? 'Thinking...' : 'Generate Roadmap'}
+              {loading ? (
+                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Thinking...</>
+              ) : '✨ Generate Roadmap'}
             </button>
           </div>
         </div>
       )}
 
       {roadmap && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-4 duration-700">
-          <div className="lg:col-span-1 space-y-6">
-            <div className="sticky top-24 space-y-4">
-              <div className="bg-white p-6 rounded-2xl notion-shadow border-t-4 border-blue-500">
-                <h2 className="text-xl font-bold text-gray-900 mb-2">{roadmap.title}</h2>
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">{roadmap.description}</p>
-                <div className="flex flex-wrap gap-2">
-                  <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full uppercase tracking-tighter">
-                    {currentProject ? 'Active Project' : 'AI Generated'}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative">
+          <div className="lg:col-span-1">
+            <div className="sticky top-20 space-y-4">
+              <div className="bg-white p-6 rounded-3xl notion-shadow border border-gray-100 overflow-hidden relative">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110"></div>
+                <h2 className="text-xl font-black text-gray-900 mb-2 relative">{roadmap.title}</h2>
+                <p className="text-sm text-gray-500 leading-relaxed mb-6 font-medium relative">{roadmap.description}</p>
+                <div className="flex flex-wrap gap-2 relative">
+                  <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl uppercase tracking-widest border border-blue-100">
+                    {currentProject ? 'Active' : 'Draft'}
                   </span>
-                  <span className="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-1 rounded-full uppercase tracking-tighter">
+                  <span className="text-[10px] font-black bg-gray-50 text-gray-500 px-3 py-1.5 rounded-xl uppercase tracking-widest border border-gray-100">
                     {roadmap.phases.length} Phases
                   </span>
                 </div>
               </div>
 
-              {!currentProject ? (
+              <div className="space-y-3">
+                {!currentProject && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || saved}
+                    className={`w-full py-4 rounded-2xl text-sm font-black transition-all shadow-xl ${saved ? 'bg-green-600 text-white shadow-green-200' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'}`}
+                  >
+                    {saving ? 'Saving...' : saved ? '✓ Project Saved' : '💾 Save to Dashboard'}
+                  </button>
+                )}
+
                 <button
-                  onClick={handleSave}
-                  disabled={saving || saved}
-                  className={`w-full py-3 rounded-xl text-sm font-bold transition-all shadow-lg ${saved ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                  onClick={handleAnalyze}
+                  disabled={analyzing}
+                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2"
                 >
-                  {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save to My Projects'}
+                  {analyzing ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : '🔍 AI Status Review'}
                 </button>
-              ) : (
-                <div className="space-y-3">
-                  <button
-                    onClick={handleAnalyze}
-                    disabled={analyzing}
-                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2"
-                  >
-                    {analyzing ? 'Analyzing...' : '🔍 AI Status Review'}
-                  </button>
 
-                  <button
-                    onClick={() => { setCurrentProject(null); setRoadmap(null); }}
-                    className="w-full py-2 text-gray-400 hover:text-gray-600 text-xs font-semibold"
-                  >
-                    Close Project
-                  </button>
-
-                  {aiFeedback && (
-                    <div className="bg-white p-4 rounded-xl notion-shadow border-l-4 border-indigo-500 animate-in fade-in duration-500 max-h-96 overflow-y-auto">
-                      <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">AI Analysis</p>
-                      <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed">
-                        {aiFeedback}
-                      </div>
+                {aiFeedback && (
+                  <div className="bg-white p-5 rounded-3xl notion-shadow border-l-4 border-indigo-500 animate-in slide-in-from-left-4 duration-500 max-h-96 overflow-y-auto custom-scrollbar">
+                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-3">AI Coach says:</p>
+                    <div className="text-sm text-gray-600 whitespace-pre-wrap leading-relaxed font-medium">
+                      {aiFeedback}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+
+                {currentProject && (
+                  <button
+                    onClick={() => { window.location.href = '#/projects'; window.location.reload(); }}
+                    className="w-full py-2 text-gray-400 hover:text-gray-600 text-[10px] font-black uppercase tracking-widest transition-colors"
+                  >
+                    ← Back to Project List
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
           <div className="lg:col-span-2 space-y-4">
             {roadmap.phases.map((phase, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-2xl notion-shadow group hover:border-blue-200 border border-transparent transition-all">
-                <div className="flex justify-between items-start mb-4">
+              <div key={idx} className="bg-white p-6 rounded-3xl notion-shadow border border-transparent hover:border-blue-100 transition-all group">
+                <div className="flex justify-between items-start mb-6">
                   <div>
-                    <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1 block">Phase {idx + 1}</span>
-                    <h3 className="text-lg font-bold text-gray-900">{phase.name}</h3>
+                    <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1 block">Phase {idx + 1}</span>
+                    <h3 className="text-xl font-black text-gray-900">{phase.name}</h3>
                   </div>
-                  <span className="text-xs font-medium text-gray-400 flex items-center gap-1 bg-gray-50 px-3 py-1 rounded-full">
+                  <span className="text-[10px] font-black text-gray-400 flex items-center gap-1.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 uppercase tracking-widest">
                     ⏱️ {phase.duration}
                   </span>
                 </div>
-                <ul className="space-y-3">
+                <ul className="space-y-4">
                   {phase.tasks.map((task, tidx) => {
-                    const isCompleted = typeof task === 'object' ? task.completed : false;
-                    const taskText = typeof task === 'object' ? task.text : task;
-
+                    const isCompleted = task.completed;
                     return (
                       <li
                         key={tidx}
-                        className={`flex items-start gap-3 group/item cursor-pointer ${isCompleted ? 'opacity-60' : ''}`}
-                        onClick={() => currentProject && toggleTask(idx, tidx)}
+                        className={`flex items-start gap-4 group/item cursor-pointer transition-all ${isCompleted ? 'opacity-50' : ''}`}
+                        onClick={() => toggleTask(idx, tidx)}
                       >
-                        <div className={`mt-1 w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center flex-shrink-0 ${isCompleted ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover/item:border-blue-500'}`}>
+                        <div className={`mt-0.5 w-6 h-6 rounded-xl border-2 transition-all flex items-center justify-center flex-shrink-0 ${isCompleted ? 'bg-blue-600 border-blue-600 scale-110 shadow-lg shadow-blue-200' : 'border-gray-200 group-hover/item:border-blue-400 bg-gray-50'}`}>
                           {isCompleted && (
-                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                            <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path></svg>
                           )}
                         </div>
-                        <span className={`text-sm transition-colors ${isCompleted ? 'line-through text-gray-500' : 'text-gray-600 group-hover/item:text-gray-900'}`}>
-                          {taskText}
+                        <span className={`text-sm font-semibold transition-all leading-tight ${isCompleted ? 'line-through text-gray-400' : 'text-gray-700 group-hover/item:text-gray-900 group-hover/item:translate-x-1'}`}>
+                          {task.text}
                         </span>
                       </li>
                     );
@@ -296,31 +332,39 @@ const Projects: React.FC = () => {
       )}
 
       {!roadmap && !loading && (
-        <div className="space-y-12">
-          <div className="py-12 flex flex-col items-center justify-center text-center opacity-50">
-            <div className="text-6xl mb-4">💡</div>
-            <h3 className="text-lg font-bold text-gray-800">Ready to build something?</h3>
-            <p className="text-sm text-gray-500 max-w-xs mx-auto">Enter a project idea above to get a professional technical roadmap from our AI.</p>
+        <div className="space-y-12 py-12">
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center text-4xl mb-6 shadow-inner animate-bounce duration-[2000] sticky top-0">🚀</div>
+            <h3 className="text-2xl font-black text-gray-900 tracking-tight">Ready to build something iconic?</h3>
+            <p className="text-gray-500 font-medium max-w-sm mx-auto mt-2">Describe your project above. Our AI will craft a custom roadmap while you sit back and relax.</p>
           </div>
 
           {myProjects.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-800">My Saved Projects</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-6">
+              <h2 className="text-xl font-black text-gray-900 tracking-tight px-2 flex items-center gap-2">
+                <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
+                Your Building History
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-medium">
                 {myProjects.map(p => (
                   <button
                     key={p._id}
                     onClick={() => {
                       setCurrentProject(p);
                       setRoadmap(p.roadmap);
+                      setAiFeedback('');
                     }}
-                    className="bg-white p-5 rounded-xl notion-shadow text-left hover:ring-2 hover:ring-blue-500 transition-all"
+                    className="group bg-white p-6 rounded-[2rem] notion-shadow text-left border border-gray-100 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all relative overflow-hidden"
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-gray-900">{p.title}</h3>
-                      <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold">{p.progress}%</span>
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150"></div>
+                    <div className="flex justify-between items-start mb-4 relative">
+                      <h3 className="font-black text-gray-900 leading-tight pr-8">{p.title}</h3>
+                      <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded-lg">{p.progress}%</span>
                     </div>
-                    <p className="text-xs text-gray-500 line-clamp-2">{p.description}</p>
+                    <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{p.description}</p>
+                    <div className="w-full bg-gray-50 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-blue-600 h-full transition-all duration-1000" style={{ width: `${p.progress}%` }}></div>
+                    </div>
                   </button>
                 ))}
               </div>

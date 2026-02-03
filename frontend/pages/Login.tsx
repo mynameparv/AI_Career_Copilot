@@ -1,9 +1,7 @@
 
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
-
-import { login, googleLogin } from '../services/authService';
+import { login } from '../services/authService';
 
 const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIsAuthenticated }) => {
   const navigate = useNavigate();
@@ -26,28 +24,6 @@ const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIs
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
-    setError('');
-    setLoading(true);
-    try {
-      if (!credentialResponse.credential) {
-        throw new Error('No credential received from Google');
-      }
-      const data = await googleLogin(credentialResponse.credential);
-      localStorage.setItem('userInfo', JSON.stringify(data));
-      setIsAuthenticated(true);
-      navigate('/dashboard');
-    } catch (err: any) {
-      setError(err.message || 'Google login failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleError = () => {
-    setError('Google login failed. Please try again.');
   };
 
   return (
@@ -95,24 +71,6 @@ const Login: React.FC<{ setIsAuthenticated: (val: boolean) => void }> = ({ setIs
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="relative py-2">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
-          <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold"><span className="bg-white px-4 text-gray-300">Or continue with</span></div>
-        </div>
-
-        {/* Google Sign-In Button */}
-        <div className="flex justify-center">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={handleGoogleError}
-            theme="outline"
-            size="large"
-            width="100%"
-            text="continue_with"
-            shape="pill"
-          />
-        </div>
 
         <p className="text-center text-sm font-medium text-gray-500">
           New here? <Link to="/register" className="text-blue-600 font-bold hover:underline">Create an account</Link>

@@ -14,5 +14,21 @@
     "status": "Planned",
     "createdAt": "2026-02-02T23:48:19.200Z",
     "updatedAt": "2026-02-02T23:48:19.200Z"
+  },
+  {
+    "_id": "e5bb1f62-803f-4b7d-9b95-57eafef8ddf2",
+    "title": "Weather Application Development Roadmap",
+    "description": "A comprehensive plan to design, develop, and deploy a cross-platform weather application using real-time API data.",
+    "status": "In Progress",
+    "createdAt": "2026-02-03T00:02:00.246Z",
+    "updatedAt": "2026-02-03T00:02:00.247Z"
+  },
+  {
+    "_id": "7d34663f-5a0c-4381-8d6e-65157310dbd3",
+    "title": "AI Assistant Development Roadmap",
+    "description": "A strategic plan for designing, building, and launching a multi-functional AI assistant using state-of-the-art natural language processing technologies.",
+    "status": "In Progress",
+    "createdAt": "2026-02-03T10:37:36.210Z",
+    "updatedAt": "2026-02-03T10:37:36.210Z"
   }
 ]
