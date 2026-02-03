@@ -55,7 +55,11 @@ export interface ATSFeedback {
 // Manages chatbot conversation messages
 // ============================================
 export function useChatStorage() {
-    const [messages, setMessages] = useLocalStorage<ChatMessage[]>('copilot_chat_messages', []);
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    const userId = userInfo._id || 'guest';
+    const storageKey = `copilot_chat_messages_${userId}`;
+
+    const [messages, setMessages] = useLocalStorage<ChatMessage[]>(storageKey, []);
 
     // Add a new user message
     const addUserMessage = (content: string) => {
@@ -99,8 +103,13 @@ export function useChatStorage() {
 // Manages ATS resume analysis feedback
 // ============================================
 export function useATSStorage() {
-    const [feedbackHistory, setFeedbackHistory] = useLocalStorage<ATSFeedback[]>('copilot_ats_feedback', []);
-    const [currentFeedback, setCurrentFeedback] = useLocalStorage<ATSFeedback | null>('copilot_ats_current', null);
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    const userId = userInfo._id || 'guest';
+    const historyKey = `copilot_ats_feedback_${userId}`;
+    const currentKey = `copilot_ats_current_${userId}`;
+
+    const [feedbackHistory, setFeedbackHistory] = useLocalStorage<ATSFeedback[]>(historyKey, []);
+    const [currentFeedback, setCurrentFeedback] = useLocalStorage<ATSFeedback | null>(currentKey, null);
 
     // Save new ATS analysis feedback
     const saveATSFeedback = (

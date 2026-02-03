@@ -9,8 +9,10 @@ const ResumeAssistant: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Use persistent storage hooks
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  const userId = userInfo._id || 'guest';
   const { currentFeedback, saveATSFeedback, clearCurrentFeedback } = useATSStorage();
-  const [jobDescription, setJobDescription] = useLocalStorage<string>('copilot_job_description', '');
+  const [jobDescription, setJobDescription] = useLocalStorage<string>(`copilot_job_description_${userId}`, '');
 
   // Convert current feedback to AnalysisResult format for display
   const analysis: AnalysisResult | null = currentFeedback ? {

@@ -50,3 +50,44 @@ export const generateProjectRoadmap = async (topic: string) => {
   // Safely parse the JSON response from the text property.
   return JSON.parse(response.text || '{}');
 };
+
+export const getDashboardSuggestions = async (userName: string, projects: any[], resumeScore: number | string) => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  const projectList = projects.map(p => `${p.title} (${p.progress}% done)`).join(', ');
+
+  const prompt = `Give me 2 very short, actionable career suggestions for ${userName}.
+  Current Projects: ${projectList || 'No projects yet'}.
+  Resume Score: ${resumeScore}.
+  
+  Format your response as a JSON array of objects with "type" (either "Strategy" or "Action") and "text".
+  Keep the text under 15 words.`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            type: { type: Type.STRING },
+            text: { type: Type.STRING }
+          },
+          required: ["type", "text"]
+        }
+      }
+    }
+  });
+
+  try {
+    return JSON.parse(response.text || '[]');
+  } catch (e) {
+    return [
+      { type: 'Strategy', text: 'Start a new technical project to boost your portfolio.' },
+      { type: 'Action', text: 'Upload your resume for a personalized AI scan.' }
+    ];
+  }
+};

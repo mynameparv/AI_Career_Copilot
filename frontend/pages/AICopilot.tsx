@@ -11,6 +11,9 @@ const INITIAL_MESSAGE: ChatMessage = {
 };
 
 const AICopilot: React.FC = () => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  const userName = userInfo.name || 'Friend';
+
   // Use persistent storage hook instead of useState
   const { messages, addUserMessage, addAIMessage, clearChat } = useChatStorage();
   const [input, setInput] = useState('');
@@ -20,9 +23,9 @@ const AICopilot: React.FC = () => {
   // Add welcome message if chat is empty
   useEffect(() => {
     if (messages.length === 0) {
-      addAIMessage(INITIAL_MESSAGE.content);
+      addAIMessage(`Hi ${userName}! I'm your AI Career & Project Copilot. How can I help you grow today? Whether it's brainstorming a project idea, reviewing a job description, or prepping for an interview, I'm here.`);
     }
-  }, []);
+  }, [userName]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -39,7 +42,8 @@ const AICopilot: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await getGeminiResponse(userMsg);
+      const systemInstruction = `You are a personal career coach for ${userName}. You know their background and goals. Always be encouraging and specific to their needs.`;
+      const response = await getGeminiResponse(userMsg, systemInstruction);
       addAIMessage(response || "I'm sorry, I couldn't generate a response.");
     } catch (error) {
       console.error(error);
