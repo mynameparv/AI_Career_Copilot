@@ -26,7 +26,14 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(cors());
+app.use(cors({
+    origin: [
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'careerhelpprojects-c5ijlk87y-parva-jains-projects.vercel.app'
+    ],
+    credentials: true
+}));
 app.use(express.json());
 
 import resumeRoutes from './routes/resumeRoutes.js';
