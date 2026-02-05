@@ -1,59 +1,29 @@
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/ai`;
 
-import { GoogleGenAI, Type } from "@google/genai";
-
-// Use process.env.API_KEY directly in the GoogleGenAI constructor.
-// Model name is updated to gemini-3-flash-preview for general text tasks.
-
-export const getGeminiResponse = async (prompt: string, systemInstruction?: string) => {
-  // Always initialize a new instance to ensure the latest environment variables are used.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      systemInstruction: systemInstruction || "You are an expert career coach and project manager. Help users with career growth, technical roadmaps, and job application strategies.",
-      temperature: 0.7,
-    },
-  });
-  // The .text property is a getter, not a method.
-  return response.text;
+const getAuthHeaders = () => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${userInfo.token}`,
+  };
 };
 
-export const generateProjectRoadmap = async (topic: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Create a detailed project roadmap for: ${topic}`,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          description: { type: Type.STRING },
-          phases: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                tasks: { type: Type.ARRAY, items: { type: Type.STRING } },
-                duration: { type: Type.STRING }
-              }
-            }
-          }
-        },
-        required: ["title", "description", "phases"]
-      }
-    }
+export const getGeminiResponse = async (prompt: string, systemInstruction?: string) => {
+  const response = await fetch(`${API_URL}/chat`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ prompt, systemInstruction }),
   });
-  // Safely parse the JSON response from the text property.
-  return JSON.parse(response.text || '{}');
+
+  if (!response.ok) {
+    throw new Error('AI analysis failed');
+  }
+
+  const data = await response.json();
+  return data.response;
 };
 
 export const getDashboardSuggestions = async (userName: string, projects: any[], resumeScore: number | string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
   const projectList = projects.map(p => `${p.title} (${p.progress}% done)`).join(', ');
 
   const prompt = `Give me 2 very short, actionable career suggestions for ${userName}.
@@ -63,28 +33,13 @@ export const getDashboardSuggestions = async (userName: string, projects: any[],
   Format your response as a JSON array of objects with "type" (either "Strategy" or "Action") and "text".
   Keep the text under 15 words.`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            type: { type: Type.STRING },
-            text: { type: Type.STRING }
-          },
-          required: ["type", "text"]
-        }
-      }
-    }
-  });
-
   try {
-    return JSON.parse(response.text || '[]');
+    const aiResponse = await getGeminiResponse(prompt, "Return ONLY a JSON array of suggestions.");
+    // The backend returns a string, so we need to parse it if it's JSON
+    const cleanedJson = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanedJson);
   } catch (e) {
+    console.warn("Suggestion parsing failed, using fallbacks.", e);
     return [
       { type: 'Strategy', text: 'Start a new technical project to boost your portfolio.' },
       { type: 'Action', text: 'Upload your resume for a personalized AI scan.' }

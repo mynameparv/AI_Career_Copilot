@@ -70,3 +70,18 @@ export const deleteProject = async (id: string): Promise<void> => {
         throw new Error('Failed to delete project');
     }
 };
+
+export const generateProject = async (topic: string): Promise<any> => {
+    const response = await fetch(`${API_URL}/generate`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ topic }),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to generate project roadmap');
+    }
+
+    return response.json();
+};

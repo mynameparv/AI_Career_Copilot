@@ -18,14 +18,14 @@ const getAIChatResponse = asyncHandler(async (req, res) => {
     }
 
     try {
-        // const model = genAI.getGenerativeModel({
-        //     model: "gemini-1.5-flash",
-        //     systemInstruction: systemInstruction
-        // });
         const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
+        // Combine system instruction with prompt for context
+        const fullPrompt = systemInstruction
+            ? `System Instruction: ${systemInstruction}\n\nUser Message: ${prompt}`
+            : prompt;
 
-        const result = await model.generateContent(prompt);
+        const result = await model.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
 
@@ -33,7 +33,7 @@ const getAIChatResponse = asyncHandler(async (req, res) => {
     } catch (error) {
         console.error('AI Chat Error:', error);
         res.status(500);
-        throw new Error('AI request failed');
+        throw new Error('AI request failed: ' + error.message);
     }
 });
 

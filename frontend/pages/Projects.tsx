@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { generateProjectRoadmap, getGeminiResponse } from '../services/geminiService';
-import { getProjects, createProject, updateProject, Project } from '../services/projectService';
+import { getGeminiResponse } from '../services/geminiService';
+import { getProjects, createProject, updateProject, deleteProject, generateProject, Project } from '../services/projectService';
 
 interface RoadmapPhase {
   name: string;
@@ -29,6 +29,7 @@ const Projects: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiFeedback, setAiFeedback] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch projects list and check for selected project
   useEffect(() => {
@@ -58,20 +59,12 @@ const Projects: React.FC = () => {
     setCurrentProject(null);
     setAiFeedback('');
     try {
-      const result = await generateProjectRoadmap(topic);
-      // Ensure tasks are objects with completion status
-      const formatted = {
-        ...result,
-        phases: result.phases.map((p: any) => ({
-          ...p,
-          tasks: p.tasks.map((t: any) =>
-            typeof t === 'string' ? { text: t, completed: false } : t
-          )
-        }))
-      };
-      setRoadmap(formatted);
-    } catch (error) {
+      // Fetch draft roadmap from backend
+      const draftRoadmap = await generateProject(topic);
+      setRoadmap(draftRoadmap);
+    } catch (error: any) {
       console.error(error);
+      alert(error.message || 'Failed to generate roadmap');
     } finally {
       setLoading(false);
     }
@@ -145,11 +138,32 @@ const Projects: React.FC = () => {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this project?')) return;
+
+    try {
+      await deleteProject(id);
+      setMyProjects(myProjects.filter(p => p._id !== id));
+      if (currentProject?._id === id) {
+        setCurrentProject(null);
+        setRoadmap(null);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete project');
+    }
+  };
+
+  const filteredProjects = myProjects.filter(p =>
+    p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const handleAnalyze = async () => {
     if (!roadmap) return;
     setAnalyzing(true);
     try {
-      // Use current roadmap state for analysis even if not saved yet
       const prompt = `I am working on a project titled "${roadmap.title}". 
       Description: ${roadmap.description}.
       
@@ -181,6 +195,18 @@ const Projects: React.FC = () => {
             {currentProject ? 'Your interactive personal roadmap' : 'Turn any idea into a professional technical plan.'}
           </p>
         </div>
+        {!currentProject && !roadmap && (
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search projects..."
+              className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold notion-shadow focus:ring-2 focus:ring-blue-500/20 transition-all outline-none"
+            />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          </div>
+        )}
         {(currentProject || roadmap) && (
           <div className="flex items-center gap-4 bg-white p-3 rounded-2xl notion-shadow border border-gray-100">
             <div className="text-right">
@@ -251,14 +277,24 @@ const Projects: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {!currentProject && (
-                  <button
-                    onClick={handleSave}
-                    disabled={saving || saved}
-                    className={`w-full py-4 rounded-2xl text-sm font-black transition-all shadow-xl ${saved ? 'bg-green-600 text-white shadow-green-200' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'}`}
-                  >
-                    {saving ? 'Saving...' : saved ? '✓ Project Saved' : '💾 Save to Dashboard'}
-                  </button>
+                {!currentProject && roadmap && (
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving || saved}
+                      className={`w-full py-4 rounded-2xl text-sm font-black transition-all shadow-xl ${saved ? 'bg-green-600 text-white shadow-green-200 cursor-default' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'}`}
+                    >
+                      {saving ? 'Saving...' : saved ? '✓ Approved & Saved' : '✅ Approve & Save Roadmap'}
+                    </button>
+                    {!saved && (
+                      <button
+                        onClick={() => { setRoadmap(null); setTopic(''); }}
+                        className="w-full py-3 bg-white text-gray-400 border border-gray-100 rounded-2xl text-xs font-bold hover:text-gray-600 transition-all"
+                      >
+                        Discard Draft
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 <button
@@ -344,9 +380,10 @@ const Projects: React.FC = () => {
               <h2 className="text-xl font-black text-gray-900 tracking-tight px-2 flex items-center gap-2">
                 <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
                 Your Building History
+                {searchTerm && <span className="text-xs text-blue-500 ml-2 font-black uppercase tracking-widest">(Filtered)</span>}
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 font-medium">
-                {myProjects.map(p => (
+                {filteredProjects.map(p => (
                   <button
                     key={p._id}
                     onClick={() => {
@@ -359,7 +396,16 @@ const Projects: React.FC = () => {
                     <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-150"></div>
                     <div className="flex justify-between items-start mb-4 relative">
                       <h3 className="font-black text-gray-900 leading-tight pr-8">{p.title}</h3>
-                      <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded-lg">{p.progress}%</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded-lg">{p.progress}%</span>
+                        <span
+                          onClick={(e) => handleDelete(e, p._id!)}
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                          title="Delete Project"
+                        >
+                          🗑️
+                        </span>
+                      </div>
                     </div>
                     <p className="text-xs text-gray-400 line-clamp-2 mb-4 leading-relaxed">{p.description}</p>
                     <div className="w-full bg-gray-50 h-1.5 rounded-full overflow-hidden">

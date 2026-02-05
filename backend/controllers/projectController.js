@@ -2,6 +2,8 @@ import asyncHandler from 'express-async-handler';
 import Project from '../models/Project.js';
 import User from '../models/User.js';
 
+import { GoogleGenAI } from '@google/genai';
+
 // @desc    Get all projects for the logged-in user
 // @route   GET /api/projects
 // @access  Private
@@ -103,7 +105,7 @@ const deleteProject = asyncHandler(async (req, res) => {
     }
 });
 
-// @desc    Generate AI Roadmap and create Project
+// @desc    Generate AI Roadmap (Preview)
 // @route   POST /api/projects/generate
 // @access  Private
 const generateProjectRoadmap = asyncHandler(async (req, res) => {
@@ -114,30 +116,54 @@ const generateProjectRoadmap = asyncHandler(async (req, res) => {
         throw new Error('Topic is required for roadmap generation');
     }
 
-    const roadmapData = {
-        title: `AI Roadmap: ${topic}`,
-        description: `Step-by-step guide for ${topic}`,
-        phases: [
-            { name: 'Research', tasks: [{ text: 'Market study', completed: false }], duration: '1 week' },
-            { name: 'Implementation', tasks: [{ text: 'Coding', completed: false }], duration: '2 weeks' }
-        ]
-    };
+    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const project = await Project.create({
-        user: req.user._id,
-        title: roadmapData.title,
-        projectType: 'roadmap',
-        description: roadmapData.description,
-        roadmap: roadmapData,
-        status: 'Planned',
-        progress: 0
-    });
+    const prompt = `Create a detailed, professional project roadmap for the topic: "${topic}".
+    The roadmap should be structured for a developer portfolio.
+    Return ONLY a JSON object with the following structure:
+    {
+      "title": "A catchy title for the project",
+      "description": "A brief, compelling description",
+      "phases": [
+        {
+          "name": "Phase Name (e.g., Planning, MVP)",
+          "tasks": ["Task 1", "Task 2"],
+          "duration": "Estimated time (e.g., 1 week)"
+        }
+      ]
+    }
+    Include at least 3 phases with 3-4 tasks each.`;
 
-    await User.findByIdAndUpdate(req.user._id, {
-        $push: { projects: project._id }
-    });
+    try {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const responseText = response.text();
 
-    res.status(201).json(project);
+        // Clean the response in case it contains markdown code blocks
+        const cleanedJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const roadmapData = JSON.parse(cleanedJson);
+
+        // Format tasks to objects for the preview
+        const formattedPhases = roadmapData.phases.map(phase => ({
+            ...phase,
+            tasks: phase.tasks.map(task => ({
+                text: typeof task === 'string' ? task : task.text,
+                completed: false
+            }))
+        }));
+
+        const previewRoadmap = {
+            ...roadmapData,
+            phases: formattedPhases
+        };
+
+        res.status(200).json(previewRoadmap);
+    } catch (error) {
+        console.error('Roadmap Generation Error:', error);
+        res.status(500);
+        throw new Error('Failed to generate roadmap preview: ' + error.message);
+    }
 });
 
 export {
