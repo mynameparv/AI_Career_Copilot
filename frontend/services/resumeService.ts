@@ -1,5 +1,5 @@
 
-const API_URL = 'http://localhost:5000/api/resume';
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/resume`;
 
 export interface AnalysisResult {
     atsScore: number;
