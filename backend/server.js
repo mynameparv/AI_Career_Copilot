@@ -30,7 +30,7 @@ app.use(cors({
     origin: [
         'http://localhost:3000',
         'http://localhost:5173',
-        'https://careerhelpprojects.vercel.app'
+        'https://careerhelpprojects-parva-jains-projects.vercel.app'
     ],
     credentials: true
 }));
